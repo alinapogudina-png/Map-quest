@@ -138,9 +138,20 @@ What is 2+2?|4</textarea>
             <label for="answerButtonHoverColor">Цвет подсветки кнопок:</label> <input type="color" id="answerButtonHoverColor" value="#B0E0E6"> 
             <label style="display:flex;align-items:center"><input type="checkbox" id="neonQuestionGlowEnabled">Включить неон рамки</label>
             <div id="neonGlowSettings" style="display:none"><label for="neonQuestionGlowColor">Цвет неона:</label><input type="color" id="neonQuestionGlowColor" value="#ff00ff"></div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="btn" id="saveProjectBtn" style="flex:1;">Сохранить проект</button>
+                <button class="btn" id="loadProjectBtn" style="flex:1;" onclick="document.getElementById('projectFileLoad').click()">Загрузить проект</button>
+                <input type="file" id="projectFileLoad" accept=".json" style="display:none;" onchange="loadProject(event)">
+            </div>
+            
             <button class="btn" id="generateCodeBtn">Сгенерировать iframe-код</button>
             <label for="htmlOutput">Сгенерированный iframe-код:</label> <textarea id="htmlOutput" readonly></textarea>
-            <button class="btn" id="copyCodeBtn">Скопировать код</button>
+            
+            <div style="display: flex; gap: 10px;">
+                <button class="btn" id="copyCodeBtn" style="flex:1;">Скопировать код</button>
+                <button class="btn" id="downloadHtmlBtn" style="flex:1; background: linear-gradient(180deg, #51cf66, #37b24d); box-shadow: 0 4px #2b8a3e;">Скачать HTML файл</button>
+            </div>
         </div>
         <div id="preview-container"><iframe id="preview-iframe"></iframe></div>
     </div>
@@ -183,7 +194,9 @@ What is 2+2?|4</textarea>
             htmlOutput: document.getElementById('htmlOutput'), copyCodeBtn: document.getElementById('copyCodeBtn'), 
             previewIframe: document.getElementById('preview-iframe'), layoutModal: document.getElementById('layout-editor-modal'), 
             openLayoutEditorBtn: document.getElementById('openLayoutEditorBtn'), closeLayoutEditorBtn: document.getElementById('close-layout-editor'), 
-            layoutIframe: document.getElementById('layout-iframe') 
+            layoutIframe: document.getElementById('layout-iframe'),
+            saveProjectBtn: document.getElementById('saveProjectBtn'),
+            downloadHtmlBtn: document.getElementById('downloadHtmlBtn')
         };
         const toggleNeonSettings = (checkbox, settingsDiv) => { settingsDiv.style.display = checkbox.checked ? 'block' : 'none'; updatePreview(); };
         editorElements.neonQuestionGlowEnabled.addEventListener('change', () => toggleNeonSettings(editorElements.neonQuestionGlowEnabled, editorElements.neonGlowSettings));
@@ -308,6 +321,72 @@ setStyles();setupUI();if('layout'===GameConfig.mode){initLayoutMode()}else if(el
         
         editorElements.copyCodeBtn.addEventListener('click', () => { if (!editorElements.htmlOutput.value) { alert('Сначала сгенерируйте код!'); return; } editorElements.htmlOutput.select(); document.execCommand('copy'); alert('Код скопирован в буфер обмена!'); });
         
+        editorElements.saveProjectBtn.addEventListener('click', () => {
+            const data = {};
+            Object.keys(editorElements).forEach(key => {
+                const el = editorElements[key];
+                if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT')) {
+                    if (el.type === 'checkbox') {
+                        data[key] = el.checked;
+                    } else {
+                        data[key] = el.value;
+                    }
+                }
+            });
+            const jsonStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([jsonStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'map_quest_project.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
+        function loadProject(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    Object.keys(data).forEach(key => {
+                        const el = editorElements[key];
+                        if (el) {
+                            if (el.type === 'checkbox') {
+                                el.checked = data[key];
+                                el.dispatchEvent(new Event('change'));
+                            } else {
+                                el.value = data[key];
+                                el.dispatchEvent(new Event('input'));
+                            }
+                        }
+                    });
+                    updatePreview();
+                    alert('Проект успешно загружен!');
+                } catch (err) {
+                    alert('Ошибка при чтении файла проекта: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        editorElements.downloadHtmlBtn.addEventListener('click', () => {
+            const finalHtml = generateGameHtml('game');
+            const blob = new Blob([finalHtml], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'map_quest_game.html';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        });
+
         function setupClearButtons() {
             document.querySelectorAll('.input-wrapper').forEach(wrapper => {
                 const input = wrapper.querySelector('input[type="text"], textarea');
